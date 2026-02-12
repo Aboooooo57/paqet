@@ -1,0 +1,48 @@
+# Universal Paqet Configuration (Docker)
+# This file relies on Environment Variables set in docker-compose.yml and .env
+
+# Role: set by PAQET_ROLE="server" or "client" in docker-compose.yml
+role: "${PAQET_ROLE}"
+
+# Logging configuration
+log:
+  level: "info"
+
+# SOCKS5 proxy configuration (Client Mode)
+socks5:
+  - listen: "0.0.0.0:1080"
+    username: ""
+    password: ""
+
+# Network interface settings
+network:
+  # Auto-detect eth0 in Docker / en0 on Mac
+  interface: "auto"
+  
+  # IPv4 configuration
+  ipv4:
+    addr: "192.168.1.100:0"
+    router_mac: "aa:bb:cc:dd:ee:ff"
+
+  ipv6:
+    addr: "[2001:db8::1]:0"
+    router_mac: "aa:bb:cc:dd:ee:ff"
+
+  tcp:
+    local_flag: ["PA"]
+    remote_flag: ["PA"]
+
+# Server connection settings
+server:
+  # PAQET_SERVER_ADDR must be set in .env (e.g., "1.2.3.4:9999")
+  # For Docker Server mode, this defines the listening port.
+  addr: "${PAQET_SERVER_ADDR}" 
+
+# Transport protocol configuration
+transport:
+  protocol: "kcp"
+  conn: 1
+  kcp:
+    mode: "fast"
+    # PAQET_SECRET_KEY must be set in .env
+    key: "${PAQET_SECRET_KEY}"

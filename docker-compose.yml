@@ -1,0 +1,45 @@
+services:
+  # Server Service
+  # Run this on your VPS/Remote Server
+  server:
+    build: .
+    image: paqet:latest
+    container_name: paqet-server
+    restart: unless-stopped
+    # network_mode: "host" # Host mode is Linux-only. Use ports for cross-platform compatibility.
+    ports:
+      - "9999:9999/tcp"
+      - "9999:9999/udp"
+    cap_add:
+      - NET_ADMIN # Required for iptables
+      - NET_RAW # Required for raw sockets
+    environment:
+      - PAQET_ROLE=server
+    env_file:
+      - .env
+    volumes:
+      - ./config.yaml:/app/config.yaml
+    command: [ "paqet", "run", "-c", "config.yaml" ]
+
+  # Client Service
+  # Run this on your local machine
+  client:
+    build: .
+    image: paqet:latest
+    container_name: paqet-client
+    restart: unless-stopped
+    # On Mac/Windows, 'host' mode doesn't allow accessing localhost:1080. 
+    # Use bridge mode + ports instead.
+    # network_mode: "host" 
+    ports:
+      - "1090:1080" # Map SOCKS5 port
+    cap_add:
+      - NET_ADMIN # Optional for client
+      - NET_RAW # Required for raw sockets
+    environment:
+      - PAQET_ROLE=client
+    env_file:
+      - .env
+    volumes:
+      - ./config.yaml:/app/config.yaml
+    command: [ "paqet", "run", "-c", "config.yaml" ]

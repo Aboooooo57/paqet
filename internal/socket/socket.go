@@ -2,8 +2,9 @@ package socket
 
 import (
 	"context"
+	crand "crypto/rand"
+	"encoding/binary"
 	"fmt"
-	"math/rand"
 	"net"
 	"os"
 	"paqet/internal/conf"
@@ -25,7 +26,9 @@ type PacketConn struct {
 // &OpError{Op: "listen", Net: network, Source: nil, Addr: nil, Err: err}
 func New(ctx context.Context, cfg *conf.Network) (*PacketConn, error) {
 	if cfg.Port == 0 {
-		cfg.Port = 32768 + rand.Intn(32768)
+		var portBuf [2]byte
+		crand.Read(portBuf[:])
+		cfg.Port = 32768 + int(binary.BigEndian.Uint16(portBuf[:]))%32768
 	}
 
 	sendHandle, err := NewSendHandle(cfg)
