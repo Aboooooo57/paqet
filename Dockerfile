@@ -2,6 +2,7 @@
 FROM golang:1.25-bookworm AS builder
 
 # Install build dependencies
+ENV GOPROXY=https://goproxy.io,direct
 RUN apt-get update && apt-get install -y libpcap-dev
 
 WORKDIR /app
