@@ -27,9 +27,12 @@ func LoadFromFile(path string) (*Conf, error) {
 		return nil, err
 	}
 
+	// Expand environment variables
+	content := os.ExpandEnv(string(data))
+
 	var conf Conf
 
-	if err := yaml.Unmarshal(data, &conf); err != nil {
+	if err := yaml.Unmarshal([]byte(content), &conf); err != nil {
 		return &conf, err
 	}
 

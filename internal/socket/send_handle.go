@@ -1,8 +1,10 @@
 package socket
 
 import (
+	crand "crypto/rand"
 	"encoding/binary"
 	"fmt"
+	"math/rand"
 	"net"
 	"paqet/internal/conf"
 	"paqet/internal/pkg/hash"
@@ -34,6 +36,8 @@ type SendHandle struct {
 	ackOptions  []layers.TCPOption
 	time        uint32
 	tsCounter   uint32
+	seqBase     uint32
+	seqAccum    uint64
 	tcpF        TCPF
 	ethPool     sync.Pool
 	ipv4Pool    sync.Pool
@@ -69,6 +73,9 @@ func NewSendHandle(cfg *conf.Network) (*SendHandle, error) {
 		{OptionType: layers.TCPOptionKindTimestamps, OptionLength: 10, OptionData: make([]byte, 8)},
 	}
 
+	var seqBuf [4]byte
+	crand.Read(seqBuf[:])
+
 	sh := &SendHandle{
 		handle:     handle,
 		srcPort:    uint16(cfg.Port),
@@ -76,6 +83,7 @@ func NewSendHandle(cfg *conf.Network) (*SendHandle, error) {
 		ackOptions: ackOptions,
 		tcpF:       TCPF{tcpF: iterator.Iterator[conf.TCPF]{Items: cfg.TCP.LF}, clientTCPF: make(map[uint64]*iterator.Iterator[conf.TCPF])},
 		time:       uint32(time.Now().UnixNano() / int64(time.Millisecond)),
+		seqBase:    binary.BigEndian.Uint32(seqBuf[:]),
 		ethPool: sync.Pool{
 			New: func() any {
 				return &layers.Ethernet{SrcMAC: cfg.Interface.HardwareAddr}
@@ -118,7 +126,7 @@ func (h *SendHandle) buildIPv4Header(dstIP net.IP) *layers.IPv4 {
 	*ip = layers.IPv4{
 		Version:  4,
 		IHL:      5,
-		TOS:      184,
+		TOS:      0,
 		TTL:      64,
 		Flags:    layers.IPv4DontFragment,
 		Protocol: layers.IPProtocolTCP,
@@ -132,7 +140,7 @@ func (h *SendHandle) buildIPv6Header(dstIP net.IP) *layers.IPv6 {
 	ip := h.ipv6Pool.Get().(*layers.IPv6)
 	*ip = layers.IPv6{
 		Version:      6,
-		TrafficClass: 184,
+		TrafficClass: 0,
 		HopLimit:     64,
 		NextHeader:   layers.IPProtocolTCP,
 		SrcIP:        h.srcIPv6,
@@ -147,28 +155,29 @@ func (h *SendHandle) buildTCPHeader(dstPort uint16, f conf.TCPF) *layers.TCP {
 		SrcPort: layers.TCPPort(h.srcPort),
 		DstPort: layers.TCPPort(dstPort),
 		FIN:     f.FIN, SYN: f.SYN, RST: f.RST, PSH: f.PSH, ACK: f.ACK, URG: f.URG, ECE: f.ECE, CWR: f.CWR, NS: f.NS,
-		Window: 65535,
+		Window: uint16(28000 + rand.Intn(8000)),
 	}
 
 	counter := atomic.AddUint32(&h.tsCounter, 1)
-	tsVal := h.time + (counter >> 3)
+	tsVal := h.time + (counter >> 3) + uint32(rand.Intn(8))
 	if f.SYN {
 		binary.BigEndian.PutUint32(h.synOptions[2].OptionData[0:4], tsVal)
 		binary.BigEndian.PutUint32(h.synOptions[2].OptionData[4:8], 0)
 		tcp.Options = h.synOptions
-		tcp.Seq = 1 + (counter & 0x7)
+		tcp.Seq = uint32(rand.Int63())
 		tcp.Ack = 0
 		if f.ACK {
 			tcp.Ack = tcp.Seq + 1
 		}
 	} else {
-		tsEcr := tsVal - (counter%200 + 50)
+		tsEcr := tsVal - uint32(rand.Intn(200)+50)
 		binary.BigEndian.PutUint32(h.ackOptions[2].OptionData[0:4], tsVal)
 		binary.BigEndian.PutUint32(h.ackOptions[2].OptionData[4:8], tsEcr)
 		tcp.Options = h.ackOptions
-		seq := h.time + (counter << 7)
-		tcp.Seq = seq
-		tcp.Ack = seq - (counter & 0x3FF) + 1400
+		growth := uint64(1200 + rand.Intn(300))
+		accum := atomic.AddUint64(&h.seqAccum, growth)
+		tcp.Seq = h.seqBase + uint32(accum)
+		tcp.Ack = tcp.Seq - uint32(rand.Intn(8192)+1)
 	}
 
 	return tcp

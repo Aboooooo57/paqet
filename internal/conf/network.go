@@ -3,6 +3,7 @@ package conf
 import (
 	"fmt"
 	"net"
+	"paqet/internal/flog"
 	"runtime"
 )
 
@@ -32,9 +33,15 @@ func (n *Network) setDefaults(role string) {
 func (n *Network) validate() []error {
 	var errors []error
 
-	if n.Interface_ == "" {
-		errors = append(errors, fmt.Errorf("network interface is required"))
+	if n.Interface_ == "" || n.Interface_ == "auto" {
+		ifaceName, err := GetDefaultInterface()
+		if err != nil {
+			return append(errors, fmt.Errorf("failed to auto-detect network interface: %v", err))
+		}
+		flog.Infof("Auto-detected network interface: %s", ifaceName)
+		n.Interface_ = ifaceName
 	}
+
 	if len(n.Interface_) > 15 {
 		errors = append(errors, fmt.Errorf("network interface name too long (max 15 characters): '%s'", n.Interface_))
 	}

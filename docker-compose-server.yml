@@ -1,0 +1,23 @@
+# Server-only Docker Compose
+# Deploy this on your VPS/Remote Server
+#
+# Usage:
+#   1. Set PAQET_SERVER_ADDR and PAQET_SECRET_KEY in .env
+#      Example: PAQET_SERVER_ADDR=0.0.0.0:17493  (use a random non-standard port)
+#   2. docker compose -f docker-compose-server.yml up -d --build
+
+services:
+  server:
+    build: .
+    image: paqet:latest
+    container_name: paqet-server
+    restart: unless-stopped
+    network_mode: "host"
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    environment:
+      - PAQET_ROLE=server
+    env_file:
+      - .env
+    command: [ "paqet", "run", "-c", "config.yaml" ]

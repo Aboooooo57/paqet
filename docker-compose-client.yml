@@ -1,0 +1,24 @@
+# Client-only Docker Compose
+# Run this on your local machine to connect to the remote server
+#
+# Usage:
+#   1. Set PAQET_SERVER_ADDR and PAQET_SECRET_KEY in .env
+#      PAQET_SERVER_ADDR must point to your server's public IP and the port it's running on
+#      Example: PAQET_SERVER_ADDR=203.0.113.50:17493
+#   2. docker compose -f docker-compose-client.yml up -d --build
+#   3. Test: curl -v https://httpbin.org/ip --proxy socks5h://127.0.0.1:1080
+
+services:
+  client:
+    build: .
+    image: paqet:latest
+    container_name: paqet-client
+    restart: unless-stopped
+    network_mode: "host"
+    cap_add:
+      - NET_RAW
+    environment:
+      - PAQET_ROLE=client
+    env_file:
+      - .env
+    command: [ "paqet", "run", "-c", "config.yaml" ]

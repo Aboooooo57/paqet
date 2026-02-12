@@ -23,7 +23,7 @@ func (c *Conn) OpenStrm() (tnet.Strm, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Strm{strm}, nil
+	return NewStrm(strm), nil
 }
 
 func (c *Conn) AcceptStrm() (tnet.Strm, error) {
@@ -31,7 +31,7 @@ func (c *Conn) AcceptStrm() (tnet.Strm, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Strm{strm}, nil
+	return NewStrm(strm), nil
 }
 
 func (c *Conn) Ping(wait bool) error {
@@ -39,14 +39,17 @@ func (c *Conn) Ping(wait bool) error {
 	if err != nil {
 		return fmt.Errorf("ping failed: %v", err)
 	}
-	defer strm.Close()
+	// Wrap with compression to match server expectation
+	s := NewStrm(strm)
+	defer s.Close()
+
 	if wait {
 		p := protocol.Proto{Type: protocol.PPING}
-		err = p.Write(strm)
+		err = p.Write(s)
 		if err != nil {
 			return fmt.Errorf("strm ping write failed: %v", err)
 		}
-		err = p.Read(strm)
+		err = p.Read(s)
 		if err != nil {
 			return fmt.Errorf("strm ping read failed: %v", err)
 		}
@@ -56,7 +59,6 @@ func (c *Conn) Ping(wait bool) error {
 	}
 	return nil
 }
-
 func (c *Conn) Close() error {
 	var err error
 	if c.UDPSession != nil {
