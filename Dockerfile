@@ -11,8 +11,8 @@ WORKDIR /app
 COPY go.mod go.sum ./
 
 # Download dependencies
-# Use a proxy to speed up downloads (optional but recommended)
-ENV GOPROXY=https://goproxy.io,direct
+# Use the official Go proxy which is often more reliable
+ENV GOPROXY=https://proxy.golang.org,direct
 RUN go mod download
 
 # Copy source code
